@@ -101,5 +101,5 @@ If you want to delete all files created by `bak`, you can find all `bak` files
 and pipe to `xargs rm`.
 
 ```bash
-fd -uu -F '\.bak\.' | xargs rm
+fd -uu -F '.bak.' | xargs rm
 ```
