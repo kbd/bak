@@ -4,6 +4,7 @@ import datetime
 import os
 import re
 import shutil
+import subprocess
 import sys
 from functools import partial
 
@@ -130,12 +131,45 @@ def backup_file(path, keep=False, symlinks=False):
     move_file(path, backup_path(path), keep, symlinks)
 
 
+def diff(difftool, files):
+    """Diff the file (files[0]) provided with its most recent backup.
+
+    If the original file is passed, compare to most recent backup.
+    If a backup file is passed, compare that to the original file.
+    """
+    if len(files) > 1:
+        printerr("Only specify one file for diff")
+        return 2
+
+    path = files[0]
+    original_path = original_file_path(path)
+    if not os.path.exists(original_path):
+        printerr(f"No file at {path}")
+        return 3
+
+    if original_path == path:  # original location provided
+        bak_path = most_recent_backup_file(path)
+        if not bak_path:
+            printerr(f"No bak file for {path}")
+            return 3
+    else:
+        bak_path = path
+
+    cmd = [difftool, bak_path, original_path]
+    print(f"Running {cmd}")
+    result = subprocess.run(cmd)
+    return result.returncode
+
+
 def main(args):
     files = args.files
     keep = args.keep
     symlinks = args.symlinks
     restore = args.restore or args.flip
     flip = args.flip
+
+    if args.diff:
+        return diff(args.difftool, files)
 
     for file in files:
         if restore:
@@ -163,5 +197,8 @@ if __name__ == '__main__':
     parser.add_argument('-s', '--symlinks', action='store_true',
         help='If copying a directory tree, leave symlinks as symlinks'
     )
+    parser.add_argument('-d', '--diff', action="store_true", help='Diff the current and most recent bak')
+    parser.add_argument('-t', '--difftool', default="kdiff3")
+
     args = parser.parse_args()
     sys.exit(main(args))
