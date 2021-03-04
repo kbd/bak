@@ -60,12 +60,39 @@ def original_file_path(path):
     return re.sub(regex, r'\1', path)
 
 
-def find_backup_files(original, files):
-    """Filter the provided 'files' list to find backup files of the 'original' filename"""
+def find_bak_files_with_prefix(files, prefix):
+    """Filter the provided 'files' list to find backup files of the original filename.
+
+    If a falsy prefix is provided, find all bak files.
+    """
     extension_regex = rf'(?:\.{EXTENSION}\.{TIMESTAMP_REGEX})+$'
-    pattern = re.escape(original) + extension_regex
+    pattern = (re.escape(prefix) if prefix else '.*?') + extension_regex
     regex = re.compile(pattern)
     return [f for f in files if regex.match(f)]
+
+
+def test__find_files_with_prefix():
+    files = [
+        'karabiner.json',
+        'karabiner.json.bak.20210203T222715',
+        'karabiner.json.bak.20200113T044504',
+        'karabiner.json.bak.20200112T201947',
+        'karabiner.json.bak.20200116T003336',
+        'karabiner.json.bak.20201217T124000',
+        'karabiner.json.bak.20210204T143806',
+        'karabiner.json.bak.20210304T150009',
+        'karabiner.json.bak.20201023T164248',
+        'assets',
+        'automatic_backups',
+        'unrelated-file.bak.20201023T164248',
+    ]
+    found = find_bak_files_with_prefix(files, 'karabiner.json')
+    expected = files[1:-3]
+    assert found == expected
+
+    found = find_bak_files_with_prefix(files, None)
+    expected = files[1:-3] + [files[-1]]
+    assert found == expected
 
 
 def most_recent_backup_file(original_path):
@@ -73,7 +100,7 @@ def most_recent_backup_file(original_path):
     path = original_path.rstrip('/')  # strip trailing slash in case of directory
     dir, filename = os.path.split(path)
     files = os.listdir(dir or '.')
-    backup_files = find_backup_files(filename, files)
+    backup_files = find_bak_files_with_prefix(files, filename)
     if not backup_files:
         return None
 
@@ -161,12 +188,23 @@ def diff(difftool, files):
     return result.returncode
 
 
+def list_baks(files):
+    for dir in files:
+        files = os.listdir(dir)
+        found_files = find_bak_files_with_prefix(files, None)
+        for file in found_files:
+            print(os.path.join(dir, file))
+
+
 def main(args):
     files = args.files
     keep = args.keep
     symlinks = args.symlinks
     restore = args.restore or args.flip
     flip = args.flip
+
+    if args.list:
+        return list_baks(files)
 
     if args.diff:
         return diff(args.difftool, files)
@@ -199,6 +237,7 @@ if __name__ == '__main__':
     )
     parser.add_argument('-d', '--diff', action="store_true", help='Diff the current and most recent bak')
     parser.add_argument('-t', '--difftool', default="kdiff3")
+    parser.add_argument('-l', '--list', action="store_true", help="Treat 'files' as directories to list bak files")
 
     args = parser.parse_args()
     sys.exit(main(args))
