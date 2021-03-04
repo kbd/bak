@@ -190,6 +190,7 @@ def diff(difftool, files):
 
 def list_baks(files):
     for dir in files:
+        dir = os.path.abspath(dir)
         files = os.listdir(dir)
         found_files = find_bak_files_with_prefix(files, None)
         for file in found_files:
