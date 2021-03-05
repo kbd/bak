@@ -60,6 +60,26 @@ def original_file_path(path):
     return re.sub(regex, r'\1', path)
 
 
+def test__original_file_path():
+    # full path
+    backup_path = '/path/to/file/foobar.baz.bak.20200314T151234'
+    expected = '/path/to/file/foobar.baz'
+    actual = original_file_path(backup_path)
+    assert expected == actual
+
+    # relative path
+    backup_path = 'foobar.baz.bak.20200314T151234'
+    expected = 'foobar.baz'
+    actual = original_file_path(backup_path)
+    assert expected == actual
+
+    # multiple levels of bak
+    backup_path = 'foobar.baz.bak.20200314T151234.bak.20200314T151234'
+    expected = 'foobar.baz'
+    actual = original_file_path(backup_path)
+    assert expected == actual
+
+
 def find_bak_files_with_prefix(files, prefix):
     """Filter the provided 'files' list to find backup files of the original filename.
 
@@ -108,6 +128,37 @@ def most_recent_backup_file(original_path):
     # in case of a file that needed repeated timestamps added, use length as tiebreaker
     backup_files.sort(key=lambda x: (x[-TIMESTAMP_LENGTH:], len(x)), reverse=True)
     return os.path.join(dir, backup_files[0])
+
+
+def test__most_recent_backup_file():
+    # found
+    original_path = 'foobar.baz'
+    files = [
+        'foobar.baz',
+        'foobar.baz.bak.20200314T151234',
+        'foobar.baz.bak.20200314T151234.bak.20200314T151234',
+        'foobar.baz.bak.20200314T151235',
+        'foobar.baz.bak.20200314T151235.bak.20200314T151235',
+    ]
+    expected = 'foobar.baz.bak.20200314T151235.bak.20200314T151235'
+    import unittest.mock
+    with unittest.mock.patch('os.listdir', return_value=files):
+        actual = most_recent_backup_file(original_path)
+    assert expected == actual
+
+    # not found
+    original_path = 'foobar.baz'
+    files = [
+        'foobar.baz',
+        'foobar.baz.bak.200200314T151234',
+        'foobar.baz.20200314T151234.bak.20200314T151234',
+        'fooobar.baz.bak.20200314T151235',
+        'foobar.baz.bak.20200314T151235.bak.20200314T1512356',
+    ]
+    expected = None
+    with unittest.mock.patch('os.listdir', return_value=files):
+        actual = most_recent_backup_file(original_path)
+    assert expected == actual
 
 
 def move_file(from_path, to_path, keep=False, symlinks=False):
